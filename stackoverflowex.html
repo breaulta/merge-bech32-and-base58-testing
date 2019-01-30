@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Testing ajax</title> 
+        <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+
+
+    <script>
+function process_address(address){
+var result;
+                    $.ajax({
+                            type: 'POST',
+                            url: '/cgi-bin/ajax.pl',
+                            data: { 'data_id': address},
+			    async: false,
+                            success: function(res) {
+                                alert("your ID is: " + res.result);
+				result = res.result;
+                            },
+                            error: function() {
+				alert("did not work");
+			    }
+                    });
+return result;
+
+}
+        </script>
+    </head>
+    <body>
+    <form action="#">
+	<input type="text" name="address">
+	<input type="button" value="submit" onclick="this.form.result.value = process_address(this.form.address.value);">
+	<input type="text" name="result">
+
+
+        <button id="test" >Testing</button>
+    <form>
+    </body>
+</html>

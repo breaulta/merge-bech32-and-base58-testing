@@ -28,3 +28,12 @@ action:decode
 01ED32770BB416469C6EF883B04C76F0115A9BF00C238F
 address:3Jrq7aCV2gi1kiEg7CD6unG7M9b5fin
 action:encode
+
+address:fdsafdsafdsa
+action:decode
+34554C7DD5884213C5
+address:
+action:encode
+No input!
+address:fdsafdsafdsa
+action:validate
