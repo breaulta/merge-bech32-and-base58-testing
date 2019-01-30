@@ -1,10 +1,21 @@
 #!/usr/bin/perl
-
 use strict;
 use warnings;
 
-use JSON; #if not already installed, just run "cpan JSON"
-use CGI;
+#use JSON; #if not already installed, just run "cpan JSON"
+use CGI qw(:standard);
+
+
+my $address = param('address');
+
+
+open (my $fd, '>>', 'logfile.txt') or die "logfile.txt: $!";
+print $fd "The addr stktest:$address";
+close $fd;
+
+
+
+=begin comment
 
 my $cgi = CGI->new;
 
@@ -18,3 +29,7 @@ my $json = $op -> encode({
     result => $id
 });
 print $json;
+
+=end comment
+
+=cut

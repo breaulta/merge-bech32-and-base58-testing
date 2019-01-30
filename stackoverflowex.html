@@ -11,11 +11,12 @@ var result;
                     $.ajax({
                             type: 'POST',
                             url: '/cgi-bin/ajax.pl',
-                            data: { 'data_id': address},
+                            data: { 'address': address},
 			    async: false,
+			    dataType: 'text',
                             success: function(res) {
-                                alert("your ID is: " + res.result);
-				result = res.result;
+                                alert("your ID is: " + res);
+				result = res;
                             },
                             error: function() {
 				alert("did not work");

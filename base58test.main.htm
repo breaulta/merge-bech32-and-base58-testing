@@ -18,10 +18,11 @@
 		url: scriptUrl,
 		type: 'post',
 		data: {address: address, b58action: action},
-		dataType: 'html',
+		//dataType: 'html',
 		async: false,
 		success: function(data) {
-			result = data;
+		alert("your data is:" + data.result);
+                        result = data.result;
 		}, error: function (request,status, error) {
 		    console.log(error);
 		    alert(status);

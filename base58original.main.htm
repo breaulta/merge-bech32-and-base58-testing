@@ -12,17 +12,18 @@
 		document.getElementById('eaddress').value = document.getElementById('dresult').value; 
 		document.getElementById('eclick').click()
 	}
-	var result = null;
+	var result = null;  //instansiation of variable.
 	var scriptUrl = "/" + "cgi-bin/base58original.cgi";
 	$.ajax({
 		url: scriptUrl,
 		type: 'post',
 		data: {address: address, b58action: action},
-		dataType: 'html',
+		//dataType: 'html',
+		dataType: 'text',
 		async: false,
 		success: function(data) {
-    alert("your data is:" + data);
-			result = data;
+    alert("your data is:" + data.result);
+			result = data.result;
 		} 
 	});
 	return result;
