@@ -14,6 +14,7 @@ use Digest::SHA qw(sha256);
 use CGI qw(:standard);
 $CGI::POST_MAX = 30000;  # don't allow inputs greater than 40000
 $CGI::DISABLE_UPLOADS = 1;  # no uploads
+print "Content-type:text/html\n\n";
 
 #The base58 characters used by Bitcoin.
 my @b58 = qw{
