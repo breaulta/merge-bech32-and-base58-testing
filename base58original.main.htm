@@ -18,11 +18,10 @@
 		url: scriptUrl,
 		type: 'post',
 		data: {address: address, b58action: action},
-		//dataType: 'html',
-		dataType: 'text',
+		dataType: 'html',
 		async: false,
 		success: function(data) {
-    alert("your data is:" + data);
+    //alert("your data is:" + data);
 			result = data;
 		} 
 	});
