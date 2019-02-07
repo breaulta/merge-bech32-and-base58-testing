@@ -2,7 +2,7 @@ This repo is for testing some personal code on a webserver.  It is not intended 
 
 
 server:
-base58original.main.htm
+/base58original.main.htm
 /base58original.main_files/
 
 cgi script:
