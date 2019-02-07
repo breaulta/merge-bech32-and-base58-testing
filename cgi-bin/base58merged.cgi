@@ -19,7 +19,6 @@ print "Content-type:text/html\n\n";
 # The set of characters used in bech32 encoding.
 my @CHARSET = ('q','p','z','r','y','9','x','8','g','f','2','t','v','d','w','0','s','3','j','n','5','4','k','h','c','e','6','m','u','a','7','l');
 # These numbers are used in the bech32 polymod function.
-# Consult https://github.com/bitcoin/bitcoin/blob/master/src/bech32.cpp for how the polymod function works.
 my @GENERATOR = (0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3);
 #The base58 characters used by Bitcoin.
 my @b58 = qw{
@@ -248,22 +247,16 @@ sub check_bech32_address {
 # Segwit address decode.
 sub decode_segwit_address {
     my $hrp = $_[0];        #Human Readable Part (hrp).
-    my $addr = $_[1];
-
-    #  my dec = bech32.decode(addr);
-    my ($hrp_string, $data_ref) = decode_bech32($addr);
-    my @data = @{$data_ref};
-
-    #die "Cannot decode Segwit address. Decoded human readable part is inequivalent to the input hrp!" if ($hrp_string ne $hrp);
-    die "Cannot decode Segwit address. The program (data) seems to be empty!" if (scalar @data < 1);
-    die "Cannot decode Segwit address. Witness versions above 16 are not specified!" if ($data[0] > 16);
-
+    my $addr_to_decode = $_[1];
+    my ($hrp_string, $data_ref) = decode_bech32($addr_to_decode);
+    my @data_squashed_bits = @{$data_ref};
+    die "Cannot decode Segwit address. The program (data) seems to be empty!" if (scalar @data_squashed_bits < 1);
+    die "Cannot decode Segwit address. Witness versions above 16 are not specified!" if ($data_squashed_bits[0] > 16);
     #removes the first element of array.  In this case, the witness version.
-    my $witness_version = shift @data;
+    my $witness_version = shift @data_squashed_bits;
     #Convert from 5 sig bits to 8 sig bits.
-    my $program_ref = convertbits(\@data, 5, 8, 0);
-    my @program = @{$program_ref};
-
+    my $program_ref = convertbits(\@data_squashed_bits, 5, 8, 0);
+    my @program = @{$program_ref};  # 'program' is the technical term for the data part of a segwit address.
     die "Cannot decode Segwit address. The program (data) is empty!" if (scalar @program == 0);
     die "Cannot decode Segwit address. The program (data) is too short!" if (scalar @program < 2);
     die "Cannot decode Segwit address. The program (data) is too long!" if (scalar @program > 40);
@@ -274,24 +267,26 @@ sub decode_segwit_address {
     return ($witness_version, \@program);
 }
 
-#data is an array with the preceeding char (witness version) removed
-#frombits and tobits are ints
-#pad is a boolean
-#function convertbits (data, frombits, tobits, pad) {
+# Data is an array with the preceeding char (witness version) removed.
+# frombits and tobits are ints.
+# pad is a boolean
+# function convertbits (data, frombits, tobits, pad) 
 sub convertbits {
     my $data_ref = $_[0];
-    my $frombits = $_[1];
-    my $tobits = $_[2];
+    my $frombits = $_[1];  # The number of significant bits to convert from.
+    my $tobits = $_[2];	   # The number of significant bits to convert to.
     my $pad_bool = $_[3];
     my $test;
 
-    my @data = @{$data_ref};
+    my @data_to_convert = @{$data_ref};
+    # convertbits code converted from https://github.com/sipa/bech32/blob/master/ref/javascript/segwit_addr.js
+    # I don't have a great understanding of how it works-- bitmagic.
     my $acc = 0;
     my $bits = 0;
     my @ret;
     my $maxv = (1 << $tobits) - 1;
-    for (my $p = 0; $p < scalar @data; ++$p) {
-        my $value = hex($data[$p]);
+    for (my $p = 0; $p < scalar @data_to_convert; ++$p) {
+        my $value = hex($data_to_convert[$p]);
         die "Cannot convert bits from negative values!" if ($value < 0);
         die "Cannot convert bits.  One or more values in the data array are too big!" if (($value >> $frombits) != 0);
         $acc = ($acc << $frombits) | $value;
@@ -306,7 +301,6 @@ sub convertbits {
             push @ret, (($acc << ($tobits - $bits)) & $maxv);
         }
     } elsif ($bits >= $frombits || (($acc << ($tobits - $bits)) & $maxv)) {
-        #return;  #Fail condition. 
         die "Cannot convert bits! The bitmagic failed somehow.";
     }
     # Convert back to hex.
@@ -318,7 +312,7 @@ sub convertbits {
 sub decode_bech32 {
     my $bech32_encoded_string = shift;
     my @bech32_encoded = split (//, $bech32_encoded_string, length($bech32_encoded_string));
-    my $p; # p for pointer?
+    my $p; # p for pointer
     my $d; # d for decimal value of the decoded bech32 char.
     my $has_lowercase = 0;   #set to false
     my $has_uppercase = 0;   #set to false
@@ -334,56 +328,46 @@ sub decode_bech32 {
     die "Cannot decode bech32: Address must not be mixed-case!" if ($has_lowercase && $has_uppercase);
     #Convert @bech32_encoded to lowercase
     $_ = lc for @bech32_encoded;
-    my $pos;
+    my $pos;  # pos is the index that corresponds to the final instance of '1', indicating the end of the human readable part.
     # We're trying to find the value of the $pos here.
     for ($pos = 0; $pos < scalar @bech32_encoded; $pos++){ 
         # Loops through until it finds a '1'
         if ( $bech32_encoded[$pos] eq  '1' ) { last; }
     }
-    # Also #Broken
     die "Cannot decode bech32: Human Readable Part is too short!" if ($pos < 1 );
     die "Cannot decode bech32: Data + checksum is too short!" if ($pos + 7 > scalar @bech32_encoded);
     die "Cannot decode bech32: Address is too long!" if (scalar @bech32_encoded >90);
 
-    #Copy the human readable part to @hrp
-    # If the last position of the hrp is found correctly and placed into $pos,
+    # Copy the human readable part to @hrp
     my @hrp;
     # This for loop will correctly place the data from @bech32_encoded into @hrp.
     for($p = 0; $p < $pos; $p++ ){
         $hrp[$p] = $bech32_encoded[$p];
     }
     my @decoded_hex_data;
-    my $i;
-    my $chset;
-    my $bca;
-
-my $test_encoded = join('', @bech32_encoded);
     #For each of the chars in @bech32_encoded, find the hex value (index) of the bech32 char in CHARSET and save.
     for ($p = $pos + 1; $p < scalar @bech32_encoded; ++$p) {
         $d = -1;
-        for ($i = 0; $i < scalar @CHARSET; $i++) {
+        for (my $i = 0; $i < scalar @CHARSET; $i++) {
             if ($CHARSET[$i] eq $bech32_encoded[$p]){
-                #$d = $bech32_encoded[$p];
-                #d is the index of the char in CHARSET and also the value in hex.
+                #d is the index of the char in CHARSET and also the corresponding value when converted to hex.
                 $d = $i;
                 last;
             }
         }
-        die "Encoded:~$test_encoded~" if ($d eq '-1');
-        #die "Cannot decode bech32: Invalid bech32 character detected!" if ($d eq '-1');
+        die "Cannot decode bech32: Invalid bech32 character detected!" if ($d eq '-1');
         push @decoded_hex_data, $d;
     }
-
     my $hrp_str = join('', @hrp);
     my $vfyChk = verifyChecksum($hrp_str, \@decoded_hex_data); # Passes in the decoded hex representation of the bech32 char
     die "Cannot decode bech32: Invalid checksum!" if (!$vfyChk);
-    my @data_ret;
+    my @data_to_ret;
     for ($p = 0; $p < scalar @decoded_hex_data - 6; $p++){
-        $data_ret[$p] = $decoded_hex_data[$p];
+        $data_to_ret[$p] = $decoded_hex_data[$p];
     }
     #Convert the values in the return array to 2 digit hex values.
-    foreach (@data_ret){ $_ = sprintf("%.2x", $_); }
-    return ($hrp_str, \@data_ret);
+    foreach (@data_to_ret){ $_ = sprintf("%.2x", $_); }
+    return ($hrp_str, \@data_to_ret);
 }
 
 # This sub handles one of the polymod functions. It takes the hrp string and expands it into an array.
