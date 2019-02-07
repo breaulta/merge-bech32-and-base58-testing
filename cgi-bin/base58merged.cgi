@@ -16,6 +16,11 @@ $CGI::POST_MAX = 30000;  # don't allow inputs greater than 40000
 $CGI::DISABLE_UPLOADS = 1;  # no uploads
 print "Content-type:text/html\n\n";
 
+# The set of characters used in bech32 encoding.
+my @CHARSET = ('q','p','z','r','y','9','x','8','g','f','2','t','v','d','w','0','s','3','j','n','5','4','k','h','c','e','6','m','u','a','7','l');
+# These numbers are used in the bech32 polymod function.
+# Consult https://github.com/bitcoin/bitcoin/blob/master/src/bech32.cpp for how the polymod function works.
+my @GENERATOR = (0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3);
 #The base58 characters used by Bitcoin.
 my @b58 = qw{
       1 2 3 4 5 6 7 8 9
@@ -35,7 +40,11 @@ print "Too many characters! Try the Perl source code below." and exit if length(
 
 if ($b58action eq "validate"){
 	my $address_type = check_bitcoin_address($address);
-	print "Bitcoin address is valid.  Address type: '", $address_type, "'.\n";
+	if ($address_type =~ /^INVALID BECH32$/){
+	    print "Invalid bitcoin address that looks like it might be bech32.";
+	} else {
+	    print "Bitcoin address is valid.  Address type: '", $address_type, "'.\n";
+	}
 }
 elsif ($b58action eq "decode"){
 	print decodebase58tohex($address);
@@ -121,13 +130,21 @@ sub unbase58 {
 #See https://en.bitcoin.it/wiki/List_of_address_prefixes for valid address types.
 sub check_bitcoin_address {
         my $base58_address = shift;
+	#Bech32 check.
+	my $bech32_check_return;
+	if ($base58_address =~ /^bc/i || $base58_address =~ /^tb/i){  # Probably bech32.
+	    # The eval loop catches 'die' conditions, which indicate an invalid bech32 address.
+	    eval { $bech32_check_return = check_bech32_address($base58_address)};
+	    if ($@){
+		    return "INVALID BECH32";
+		} else {   # Valid bech32 address.
+		    return "Valid BECH32:$bech32_check_return";
+	    }
+	}
         my @decoded_binary_address = unbase58 $base58_address;
         #See if last 4 bytes of the 25-byte base58 decoded bitcoin address (i.e. the checksum) match the double sha256 hash of the first 21 bytes.
         print "Invalid bitcoin address! Address is not 25 bytes!\n" and exit if scalar @decoded_binary_address != 25;
         print "Invalid Bitcoin address! Bad SHA-256 checksum!\n" and exit unless (pack 'C*', @decoded_binary_address[21..24]) eq substr sha256(sha256 pack 'C*', @decoded_binary_address[0..20]), 0, 4;
-
-	# Bech32 code.
-	#check_bech32_address( );
 
         #Standard bitcoin address.
         if ($base58_address =~ /^1/){
@@ -187,9 +204,6 @@ sub encodebase58fromhex {
 }
 
 # Bech32 functionality.
-# This is the set of characters used for encoding bech32.
-my @CHARSET = ('q','p','z','r','y','9','x','8','g','f','2','t','v','d','w','0','s','3','j','n','5','4','k','h','c','e','6','m','u','a','7','l');
-my @GENERATOR = (0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3);
 #Dies if the address is bad, otherwise returns the type of bech32 address.
 sub check_bech32_address {
     my $bech32_address = shift;
@@ -198,7 +212,7 @@ sub check_bech32_address {
     my $human_readable_part = $1; #$1 refers to group 1 of the regex above - everything until the last '1'.
     #A successful return from the decode sub guarantees some sort of bech32 address.
     #Otherwise, it will die.
-    my ($witness_version, $decoded_hex_data_ref) = decode_segwit($human_readable_part, $bech32_address);
+    my ($witness_version, $decoded_hex_data_ref) = decode_segwit_address($human_readable_part, $bech32_address);
     my @decoded_hex_data = @{$decoded_hex_data_ref};
     #Logic block.
     if ($witness_version == 0) {
@@ -342,6 +356,8 @@ sub decode_bech32 {
     my $i;
     my $chset;
     my $bca;
+
+my $test_encoded = join('', @bech32_encoded);
     #For each of the chars in @bech32_encoded, find the hex value (index) of the bech32 char in CHARSET and save.
     for ($p = $pos + 1; $p < scalar @bech32_encoded; ++$p) {
         $d = -1;
@@ -353,7 +369,8 @@ sub decode_bech32 {
                 last;
             }
         }
-        die "Cannot decode bech32: Invalid bech32 character detected!" if ($d eq '-1');
+        die "Encoded:~$test_encoded~" if ($d eq '-1');
+        #die "Cannot decode bech32: Invalid bech32 character detected!" if ($d eq '-1');
         push @decoded_hex_data, $d;
     }
 
