@@ -37,10 +37,13 @@ my $b58action = param('b58action') // "EMPTY";
 print "No input!" and exit if length($address) == 0;
 print "Too many characters! Try the Perl source code below." and exit if length($address) > 20000;
 
+# https://slowli.github.io/bech32-buffer/
 if ($b58action eq "validate"){
 	my $address_type = check_bitcoin_address($address);
 	if ($address_type =~ /^INVALID BECH32$/){
-	    print "Invalid bitcoin address that looks like it might be bech32.";
+	    print "Invalid Bech32 address! For Bech32 encode/decode visit:https://slowli.github.io/bech32-buffer/";
+	} elsif ($address_type =~ /^BECH32/){
+	    print "Valid $address_type. For Bech32 encode/decode visit:https://slowli.github.io/bech32-buffer/";
 	} else {
 	    print "Bitcoin address is valid.  Address type: '", $address_type, "'.\n";
 	}
@@ -137,7 +140,7 @@ sub check_bitcoin_address {
 	    if ($@){
 		    return "INVALID BECH32";
 		} else {   # Valid bech32 address.
-		    return "Valid BECH32:$bech32_check_return";
+		    return "BECH32:$bech32_check_return";
 	    }
 	}
         my @decoded_binary_address = unbase58 $base58_address;
